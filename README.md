@@ -7,10 +7,4 @@ cargo tauri build
 ```bash
 cargo tauri dev
 ```
-# mango
-# mango
-# mango
-# mango
-# mango
-# mango
-# mango
+
