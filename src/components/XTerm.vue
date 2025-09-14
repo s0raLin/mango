@@ -25,8 +25,19 @@ const commandBuffer = ref('')
 // 拆分命令和参数
 const cmd = computed(() => commandBuffer.value.split(' ')[0] || '')
 const args = computed(() => commandBuffer.value.split(' ').slice(1))
-const commandHistory = ref([])
+const commandHistory = ref([]) // 命令历史
+const historyIndex = ref(-1) // 跟踪历史记录中的当前位置
 
+const currentInput = ref('') // 存储当前输入，用于在历史记录中导航时保存用户输入
+
+// 在组件顶部添加常量
+// 定义提示符文本
+const PROMPT_TEXT = ref('[bash]$')
+
+// 创建一个计算提示符长度的函数
+function getPromptLength() {
+  return PROMPT_TEXT.value.length
+}
 
 // 组件挂载后执行
 onMounted(() => {
@@ -56,7 +67,7 @@ onMounted(() => {
 
   // 定义一个简单的 prompt 方法
   term.prompt = () => {
-    term.write('\r\n[bash]$ ') // \r\n 表示换行
+    term.write(`\r\n${PROMPT_TEXT.value} `) // \r\n 表示换行
   }
 
   // 显示初始提示符
@@ -64,30 +75,94 @@ onMounted(() => {
 
   // 监听用户按键
   term.onKey(e => {
+    
     const ev = e.domEvent
     // 判断是否为可打印字符
     const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey
 
-    if (ev.key === 'Enter') {
-      if(commandBuffer.value.length === 0) {
-        term.prompt()
-      }
-      // 处理命令执行
-      handleCommand(commandBuffer.value)
-      // 回车时显示新的提示符
-      commandHistory.value.push(commandBuffer.value)
-      commandBuffer.value = ''
+    const promptLength = getPromptLength() // 动态获取提示符长度
+
+    switch (ev.key) {
+        case 'Enter': {
+            if(commandBuffer.value.length === 0) {
+                term.prompt()
+            }
+            // 处理命令执行
+            handleCommand(commandBuffer.value)
+            // 回车时显示新的提示符
+            commandHistory.value.push(commandBuffer.value)
+            commandBuffer.value = ''
+        } break
       
-    } else if (ev.key === 'Backspace') {
-      // 处理退格，防止删除提示符
-      if (term._core.buffer.x > 2) {
-        term.write('\b \b')
-        commandBuffer.value = commandBuffer.value.slice(0, -1)
-      }
-    } else if (printable) {
-      // 打印可输入字符
-      term.write(e.key)
-      commandBuffer.value += e.key
+        case 'Backspace': {
+            // 只有当光标位置在提示符之后时才允许退格
+    const promptLength = getPromptLength() // 动态获取提示符长度
+            if (term._core.buffer.x > promptLength+1) { // "[bash]$ " 是 8 个字符
+                term.write('\b \b')
+                commandBuffer.value = commandBuffer.value.slice(0, -1)
+            }
+        } break
+        case 'ArrowUp': {
+            ev.preventDefault()
+            if (commandHistory.value.length > 0) {
+                if (historyIndex.value === -1) {
+                    // 保存当前输入到 currentInput 而不是覆盖 commandHistory
+                    currentInput.value = commandBuffer.value
+                }
+        
+                if (historyIndex.value < commandHistory.value.length - 1) {
+                    historyIndex.value++
+                    const historyCommand = commandHistory.value[commandHistory.value.length - 1 - historyIndex.value]
+        
+                    // 清除当前行
+                    while (commandBuffer.value.length > 0) {
+                        if (term._core.buffer.x > 2) {
+                            term.write('\b \b')
+                            commandBuffer.value = commandBuffer.value.slice(0, -1)
+                        }
+                    }
+        
+                    // 显示历史命令
+                    term.write(historyCommand)
+                    commandBuffer.value = historyCommand
+                }
+            }
+        } break
+      
+        case 'ArrowDown': {// 下箭头键 
+            ev.preventDefault()
+            if (historyIndex.value >= 0) {
+                historyIndex.value--
+        
+                // 清除当前行
+                while (commandBuffer.value.length > 0) {
+                    if (term._core.buffer.x > promptLength) {
+                        term.write('\b \b')
+                        commandBuffer.value = commandBuffer.value.slice(0, -1)
+                    }
+                }
+        
+                if (historyIndex.value === -1) {
+                    // 回到原始输入
+                    term.write(commandHistory || '')
+                    commandBuffer.value = commandHistory || ''
+                } else {
+                    const historyCommand = commandHistory.value[commandHistory.value.length - 1 - historyIndex.value]
+                    term.write(historyCommand)
+                    commandBuffer.value = historyCommand
+                }
+            } 
+        } break
+        default: {
+            if (printable) {
+                // 确保光标不会移动到提示符之前（位置8是提示符结束的位置）
+                if (term._core.buffer.x >= promptLength) {
+                    term.write(e.key)
+                    commandBuffer.value += e.key
+                }
+            }
+        } break
+
     }
 
     // 处理Ctrl组合键

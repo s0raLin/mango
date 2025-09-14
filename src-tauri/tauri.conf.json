@@ -24,16 +24,20 @@
     },
     "withGlobalTauri": true
   },
-  "bundle": {
+ "bundle": {
     "active": true,
-    "targets": ["appimage"], 
+    "targets": ["appimage","deb","msi"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "category": "Utility",
+    "shortDescription": "A simple mango application built with Tauri and Vue",
+    "longDescription": "Mango is a cross-platform desktop application built with Tauri and Vue. This AppImage is packaged for Linux users."
   }
+
  
 }
